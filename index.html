@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 10.3</title>
+    <title>Habit Vibe 10.4</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
@@ -32,7 +32,8 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // アイコンコンポーネント
+        // --- 部品（コンポーネント）を外に出して安定させる ---
+
         const Icon = ({ name, size = 18, className = "" }) => {
             useEffect(() => {
                 if (window.lucide && window.lucide.createIcons) {
@@ -47,116 +48,9 @@
             KEN: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=200&h=200"
         };
 
-        function HabitApp() {
-            const [history, setHistory] = useState([]);
-            const [inputs, setInputs] = useState({ hiit: "", cooking: "", centering: "", meditation: "", greenEx: "", pages: "", mission: "", meal: "" });
-            const [activeTab, setActiveTab] = useState('input');
-            const [status, setStatus] = useState("読込中");
-            const [tDate, setTDate] = useState(new Date().toLocaleDateString('sv-SE'));
-
-            const today = new Date().toLocaleDateString('sv-SE');
-            const GOAL = 500;
-
-            // データ読み込み
-            useEffect(() => {
-                try {
-                    const saved = localStorage.getItem('habit-v6-direct');
-                    if (saved) {
-                        const parsed = JSON.parse(saved);
-                        if (Array.isArray(parsed)) setHistory(parsed);
-                    }
-                    setStatus("同期完了");
-                } catch(e) {
-                    setHistory([]);
-                }
-            }, []);
-
-            useEffect(() => {
-                if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
-            });
-
-            const save = (data) => {
-                setHistory(data);
-                localStorage.setItem('habit-v6-direct', JSON.stringify(data));
-                const now = new Date();
-                setStatus(`保存:${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`);
-            };
-
-            // 全角数字を半角に変換する関数
-            const normalizeNumber = (str) => {
-                return str.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
-            };
-
-            const add = (key, val) => {
-                if (!val) return;
-                const strVal = val.toString().trim();
-                if (strVal === "") return;
-
-                let finalVal;
-                // ミッションと食事以外は数字として扱う
-                if (key === 'mission' || key === 'meal') {
-                    finalVal = strVal;
-                } else {
-                    // 全角数字対応
-                    const numStr = normalizeNumber(strVal);
-                    finalVal = parseInt(numStr, 10);
-                }
-
-                if (typeof finalVal === 'number' && isNaN(finalVal)) return;
-
-                const entry = { id: Date.now(), date: tDate, key: key, value: finalVal };
-                save([...history, entry]);
-                setInputs(prev => ({ ...prev, [key]: "" })); // 入力欄を空にする
-            };
-
-            // 冷水・弁当のトグル
-            const toggle = (key) => {
-                const existing = history.find(e => e.date === tDate && e.key === key);
-                if (existing) {
-                    save(history.filter(e => e.id !== existing.id));
-                } else {
-                    const entry = { id: Date.now(), date: tDate, key: key, value: 1 };
-                    save([...history, entry]);
-                }
-            };
-
-            // ポイント計算
-            const weeklyPoints = useMemo(() => {
-                let pts = 0;
-                const limit = new Date(); limit.setDate(limit.getDate() - 7);
-                const limitStr = limit.toLocaleDateString('sv-SE');
-
-                history.forEach(e => {
-                    if (e && e.date >= limitStr && typeof e.value === 'number') {
-                        let w = 1; 
-                        if (e.key === 'hiit') w = 20;
-                        if (e.key === 'cooking') w = 30;
-                        if (e.key === 'coldWater') w = 10;
-                        if (e.key === 'bento') w = 10;
-                        pts += (e.value * w);
-                    }
-                });
-                return pts;
-            }, [history]);
-
-            const luxury = weeklyPoints >= GOAL;
-
-            // 今日の合計計算
-            const dayTotals = useMemo(() => {
-                const res = {};
-                history.filter(e => e.date === tDate).forEach(e => {
-                    if (typeof e.value === 'number') res[e.key] = (res[e.key] || 0) + e.value;
-                });
-                return res;
-            }, [history, tDate]);
-
-            const bestDish = useMemo(() => {
-                const m = history.filter(e => e.key === 'meal');
-                return m.length > 0 ? m[m.length-1].value : null;
-            }, [history]);
-
-            // 高機能カード
-            const Card = ({ id, label, icon, color, unit, weight }) => (
+        // 入力カードを独立させる（これで入力フォーカスが外れません）
+        const Card = ({ id, label, icon, color, unit, weight, inputs, setInputs, add, dayTotal }) => {
+            return (
                 <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm space-y-3">
                     <div className="flex justify-between items-center px-1 font-bold text-slate-600 text-sm">
                         <div className="flex items-center gap-2">
@@ -164,8 +58,7 @@
                             <span>{label} <span className="text-[10px] text-slate-400 font-normal">{weight}</span></span>
                         </div>
                         <div className="flex items-baseline gap-1">
-                            {/* 合計値を表示 */}
-                            <span className="text-xl font-black text-slate-800">{(dayTotals[id] || 0)}</span>
+                            <span className="text-xl font-black text-slate-800">{dayTotal || 0}</span>
                             <span className="text-[10px] text-slate-400 ml-1 uppercase">{unit}</span>
                         </div>
                     </div>
@@ -175,9 +68,8 @@
                             inputMode="numeric" 
                             placeholder="入力" 
                             value={inputs[id] || ""} 
-                            onChange={(e)=>setInputs({...inputs, [id]:e.target.value})} 
+                            onChange={(e)=>setInputs(prev => ({...prev, [id]:e.target.value}))} 
                             onKeyDown={(e) => {
-                                // 変換中のエンターキーは無視、確定後のエンターのみ実行
                                 if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                                     add(id, inputs[id]);
                                 }
@@ -188,136 +80,9 @@
                     </div>
                 </div>
             );
+        };
 
-            return (
-                <div className="max-w-md mx-auto p-4 pb-24 min-h-screen fade-in">
-                    <header className="flex justify-between items-center mb-6 px-1">
-                        <div>
-                            <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 10.3</h1>
-                            <span className="text-[10px] font-bold text-emerald-500 mt-1 uppercase tracking-widest flex items-center gap-1"><Icon name="check-circle" size={12} /> {status}</span>
-                        </div>
-                        <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
-                            <button onClick={() => setActiveTab('input')} className={`p-2.5 rounded-xl ${activeTab==='input'?'bg-indigo-600 text-white':'text-slate-400'}`}><Icon name="edit-3" /></button>
-                            <button onClick={() => setActiveTab('stats')} className={`p-2.5 rounded-xl ${activeTab==='stats'?'bg-indigo-600 text-white':'text-slate-400'}`}><Icon name="bar-chart-2" /></button>
-                        </div>
-                    </header>
-
-                    <div className="mb-4 flex items-center gap-3 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 text-sm">
-                        <Icon name="calendar" className="text-indigo-400" />
-                        <input type="date" value={tDate} onChange={(e)=>setTDate(e.target.value)} className="bg-transparent font-bold text-slate-700 outline-none w-32" />
-                        {tDate !== today && <button onClick={()=>setTDate(today)} className="ml-auto text-[10px] font-bold text-indigo-600">今日</button>}
-                    </div>
-
-                    <div className="mb-6 px-1">
-                        <div className="flex justify-between items-end mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            <span>Weekly Goal</span>
-                            <span className={luxury ? 'text-amber-500' : 'text-indigo-600'}>{weeklyPoints} / {GOAL} pts</span>
-                        </div>
-                        <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden shadow-inner">
-                            <div className={`h-full transition-all duration-1000 ${luxury ? 'bg-amber-400 shadow-[0_0_15px_#fbbf24]' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, (weeklyPoints / GOAL) * 100)}%` }}></div>
-                        </div>
-                    </div>
-
-                    <div className={`rounded-[2.5rem] p-5 mb-6 text-white shadow-lg relative transition-all duration-500 ${luxury ? 'luxury-aura bg-amber-500' : 'bg-slate-700'} bg-gradient-to-r`}>
-                        <div className="relative z-10 flex items-center gap-4">
-                            <img src={luxury ? CATS.KEN : CATS.SHIU} className="w-14 h-14 rounded-full border-2 border-white/40 object-cover" alt="cat" />
-                            <div className="flex-1 text-sm font-bold">
-                                <p className="text-[10px] opacity-80 uppercase leading-none mb-1">{luxury ? "✨Master Mode" : "HIRO'S VIBE"}</p>
-                                <p className="italic leading-snug">「{luxury ? "hiroさん…500pt達成！凄すぎて胸がいっぱいニャ…♡" : "冷水とお弁当は10pt！HIITは20倍だニャ！"}」</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {activeTab === 'input' ? (
-                        <div key="input-view" className="space-y-4 animate-in fade-in">
-                            <div className="p-6 rounded-[2.5rem] bg-indigo-50 border border-indigo-100 space-y-3">
-                                <div className="flex items-center gap-2 font-bold text-indigo-600 text-[10px] uppercase tracking-widest"><Icon name="flag" size={14} /> MISSION</div>
-                                <div className="flex gap-2">
-                                    <input type="text" placeholder="例：HIIT完了！" value={inputs.mission} 
-                                        onChange={(e)=>setInputs({...inputs, mission:e.target.value})} 
-                                        onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && add('mission', inputs.mission)}
-                                        className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none" />
-                                    <button onClick={()=>add('mission', inputs.mission)} className="bg-indigo-600 text-white p-3 rounded-2xl"><Icon name="send" /></button>
-                                </div>
-                            </div>
-
-                            <div className="p-6 rounded-[2.5rem] bg-rose-50 border border-rose-100 space-y-3">
-                                <div className="flex items-center gap-2 font-bold text-rose-600 text-[10px] uppercase tracking-widest"><Icon name="heart" size={14} /> MENU (30pt)</div>
-                                <div className="flex gap-2">
-                                    <input type="text" placeholder="例：山芋の茶碗蒸し！" value={inputs.meal} 
-                                        onChange={(e)=>setInputs({...inputs, meal:e.target.value})} 
-                                        onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && add('meal', inputs.meal)}
-                                        className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none" />
-                                    <button onClick={()=>add('meal', inputs.meal)} className="bg-rose-500 text-white p-3 rounded-2xl"><Icon name="utensils" /></button>
-                                </div>
-                            </div>
-
-                            <Card id="hiit" label="HIIT" icon="zap" color="text-red-500" unit="分" weight="x20pt" />
-                            <Card id="cooking" label="料理記録" icon="chef-hat" color="text-rose-500" unit="回" weight="x30pt" />
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <button onClick={() => toggle('coldWater')} className={`p-5 rounded-[2.5rem] border flex flex-col items-center gap-1 transition-all shadow-sm ${dayTotals['coldWater'] ? 'bg-blue-500 text-white border-blue-600 shadow-lg' : 'bg-white text-blue-500 border-slate-100'}`}>
-                                    <Icon name="droplets" size={24} />
-                                    <span className="text-[9px] font-black uppercase">冷水 (10pt)</span>
-                                </button>
-                                <button onClick={() => toggle('bento')} className={`p-5 rounded-[2.5rem] border flex flex-col items-center gap-1 transition-all shadow-sm ${dayTotals['bento'] ? 'bg-amber-500 text-white border-amber-600 shadow-lg' : 'bg-white text-amber-500 border-slate-100'}`}>
-                                    <Icon name="box" size={24} />
-                                    <span className="text-[9px] font-black uppercase">弁当 (10pt)</span>
-                                </button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <Card id="centering" label="センタリング" icon="compass" color="text-blue-500" unit="分" />
-                                <Card id="greenEx" label="グリーンEX" icon="tree-pine" color="text-emerald-500" unit="分" />
-                                <Card id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" />
-                                <Card id="pages" label="読書" icon="book-open" color="text-orange-500" unit="頁" />
-                            </div>
-
-                            <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 mt-6 mb-10">
-                                <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 italic flex items-center gap-2"><Icon name="list" size={12} /> {tDate} Logs</h2>
-                                <div className="space-y-2">
-                                    {history.filter(e => e.date === tDate).reverse().map(e => (
-                                        <div key={e.id} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 px-1">
-                                            <div className="flex flex-col text-sm font-bold leading-tight">
-                                                <span className="text-[8px] font-bold text-slate-300 uppercase">{e.key}</span>
-                                                <span className={e.key === 'meal' ? 'text-rose-500 italic' : 'text-slate-600'}>{typeof e.value === 'number' ? `+${e.value}` : e.value}</span>
-                                            </div>
-                                            <button onClick={() => save(history.filter(h => h.id !== e.id))} className="text-slate-200 p-2"><Icon name="trash-2" size={16} /></button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div key="stats-view" className="space-y-6 animate-in fade-in pb-10">
-                            {bestDish && (
-                                <div className="p-8 rounded-[2.5rem] bg-white shadow-lg border-2 border-rose-100 text-center space-y-3">
-                                    <Icon name="award" className="text-rose-500 mx-auto" size={32} />
-                                    <h2 className="text-[10px] font-black text-rose-400 uppercase tracking-widest text-center">Week's Best Dish</h2>
-                                    <p className="text-xl font-black text-slate-800 leading-tight italic">「{bestDish}」</p>
-                                </div>
-                            )}
-                            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 text-center">
-                                <button onClick={() => {
-                                    const logs = history.map(h => `${h.date} [${h.key}] ${h.value}`).join('\n');
-                                    window.location.href = `mailto:?subject=HabitVibe_Backup&body=${encodeURIComponent(logs)}`;
-                                }} className="w-full bg-indigo-50 text-indigo-600 py-4 rounded-2xl font-bold border border-indigo-100">データバックアップ (Mail)</button>
-                            </div>
-                            <div className="mt-8 text-center">
-                                <button 
-                                    onClick={() => { if(confirm('全データをリセットしますか？')) { localStorage.clear(); location.reload(); } }} 
-                                    style={{ color: '#cbd5e1', fontSize: '10px', textDecoration: 'underline' }}>
-                                    全データをリセットして修復
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<HabitApp />);
-    </script>
-</body>
-</html>
+        function HabitApp() {
+            const [history, setHistory] = useState([]);
+            const [inputs, setInputs] = useState({ hiit: "", cooking: "", centering: "", meditation: "", greenEx: "", pages: "", mission: "", meal: "" });
+            const [activeTab, setActiveTab
