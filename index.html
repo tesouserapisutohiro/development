@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 10.2</title>
+    <title>Habit Vibe 10.3</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
@@ -15,28 +15,19 @@
         .luxury-aura { box-shadow: 0 0 25px rgba(251, 191, 36, 0.7); border: 4px solid #fbbf24; }
         .fade-in { animation: fadeIn 0.5s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* エラー表示用 */
-        #error-log { color: red; font-size: 12px; padding: 20px; white-space: pre-wrap; display: none; }
     </style>
 </head>
 <body>
 
-    <div id="error-log"></div>
-
     <div id="root">
-        <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: #cbd5e1;">
-            読み込み中... (画面が変わらない場合は再読み込みしてください)
+        <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; gap: 20px;">
+            <p>Vibe Coding 起動中...</p>
+            <button onclick="if(confirm('リセットしますか？')){localStorage.clear(); location.reload();}" 
+                    style="border: 1px solid #ef4444; color: #ef4444; background: white; padding: 8px 16px; border-radius: 99px; font-size: 12px; cursor: pointer;">
+                修復リセット
+            </button>
         </div>
     </div>
-
-    <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            const log = document.getElementById('error-log');
-            log.style.display = 'block';
-            log.innerHTML += `⚠️ エラー発生: ${message}\n場所: ${source}:${lineno}\n\n`;
-            document.getElementById('root').style.display = 'none'; // エラー時はローディングを消す
-        };
-    </script>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
@@ -76,11 +67,10 @@
                     }
                     setStatus("同期完了");
                 } catch(e) {
-                    setHistory([]); // データが壊れていたら初期化して続行
+                    setHistory([]);
                 }
             }, []);
 
-            // 画面描画のたびにアイコン更新
             useEffect(() => {
                 if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
             });
@@ -92,16 +82,31 @@
                 setStatus(`保存:${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`);
             };
 
+            // 全角数字を半角に変換する関数
+            const normalizeNumber = (str) => {
+                return str.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+            };
+
             const add = (key, val) => {
-                const sVal = val?.toString().trim();
-                if (!sVal) return;
-                
-                let finalVal = (key === 'mission' || key === 'meal') ? sVal : parseInt(sVal, 10);
+                if (!val) return;
+                const strVal = val.toString().trim();
+                if (strVal === "") return;
+
+                let finalVal;
+                // ミッションと食事以外は数字として扱う
+                if (key === 'mission' || key === 'meal') {
+                    finalVal = strVal;
+                } else {
+                    // 全角数字対応
+                    const numStr = normalizeNumber(strVal);
+                    finalVal = parseInt(numStr, 10);
+                }
+
                 if (typeof finalVal === 'number' && isNaN(finalVal)) return;
 
                 const entry = { id: Date.now(), date: tDate, key: key, value: finalVal };
                 save([...history, entry]);
-                setInputs(prev => ({ ...prev, [key]: "" }));
+                setInputs(prev => ({ ...prev, [key]: "" })); // 入力欄を空にする
             };
 
             // 冷水・弁当のトグル
@@ -136,7 +141,7 @@
 
             const luxury = weeklyPoints >= GOAL;
 
-            // 今日の合計計算（足し算機能用）
+            // 今日の合計計算
             const dayTotals = useMemo(() => {
                 const res = {};
                 history.filter(e => e.date === tDate).forEach(e => {
@@ -150,7 +155,7 @@
                 return m.length > 0 ? m[m.length-1].value : null;
             }, [history]);
 
-            // 高機能カード（数字の合計を表示）
+            // 高機能カード
             const Card = ({ id, label, icon, color, unit, weight }) => (
                 <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm space-y-3">
                     <div className="flex justify-between items-center px-1 font-bold text-slate-600 text-sm">
@@ -159,13 +164,26 @@
                             <span>{label} <span className="text-[10px] text-slate-400 font-normal">{weight}</span></span>
                         </div>
                         <div className="flex items-baseline gap-1">
-                            {/* ここで合計値を表示 */}
+                            {/* 合計値を表示 */}
                             <span className="text-xl font-black text-slate-800">{(dayTotals[id] || 0)}</span>
                             <span className="text-[10px] text-slate-400 ml-1 uppercase">{unit}</span>
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <input type="number" placeholder="入力" value={inputs[id] || ""} onChange={(e)=>setInputs({...inputs, [id]:e.target.value})} className="flex-1 bg-slate-50 rounded-xl px-4 py-2 font-bold outline-none text-slate-700" />
+                        <input 
+                            type="text" 
+                            inputMode="numeric" 
+                            placeholder="入力" 
+                            value={inputs[id] || ""} 
+                            onChange={(e)=>setInputs({...inputs, [id]:e.target.value})} 
+                            onKeyDown={(e) => {
+                                // 変換中のエンターキーは無視、確定後のエンターのみ実行
+                                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                                    add(id, inputs[id]);
+                                }
+                            }}
+                            className="flex-1 bg-slate-50 rounded-xl px-4 py-2 font-bold outline-none text-slate-700" 
+                        />
                         <button onClick={()=>add(id, inputs[id])} className="bg-indigo-600 text-white px-5 rounded-xl active:scale-95 shadow-md"><Icon name="plus" /></button>
                     </div>
                 </div>
@@ -175,7 +193,7 @@
                 <div className="max-w-md mx-auto p-4 pb-24 min-h-screen fade-in">
                     <header className="flex justify-between items-center mb-6 px-1">
                         <div>
-                            <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 10.2</h1>
+                            <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 10.3</h1>
                             <span className="text-[10px] font-bold text-emerald-500 mt-1 uppercase tracking-widest flex items-center gap-1"><Icon name="check-circle" size={12} /> {status}</span>
                         </div>
                         <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
@@ -215,7 +233,10 @@
                             <div className="p-6 rounded-[2.5rem] bg-indigo-50 border border-indigo-100 space-y-3">
                                 <div className="flex items-center gap-2 font-bold text-indigo-600 text-[10px] uppercase tracking-widest"><Icon name="flag" size={14} /> MISSION</div>
                                 <div className="flex gap-2">
-                                    <input type="text" placeholder="例：HIIT完了！" value={inputs.mission} onChange={(e)=>setInputs({...inputs, mission:e.target.value})} className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none" />
+                                    <input type="text" placeholder="例：HIIT完了！" value={inputs.mission} 
+                                        onChange={(e)=>setInputs({...inputs, mission:e.target.value})} 
+                                        onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && add('mission', inputs.mission)}
+                                        className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none" />
                                     <button onClick={()=>add('mission', inputs.mission)} className="bg-indigo-600 text-white p-3 rounded-2xl"><Icon name="send" /></button>
                                 </div>
                             </div>
@@ -223,7 +244,10 @@
                             <div className="p-6 rounded-[2.5rem] bg-rose-50 border border-rose-100 space-y-3">
                                 <div className="flex items-center gap-2 font-bold text-rose-600 text-[10px] uppercase tracking-widest"><Icon name="heart" size={14} /> MENU (30pt)</div>
                                 <div className="flex gap-2">
-                                    <input type="text" placeholder="例：山芋の茶碗蒸し！" value={inputs.meal} onChange={(e)=>setInputs({...inputs, meal:e.target.value})} className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none" />
+                                    <input type="text" placeholder="例：山芋の茶碗蒸し！" value={inputs.meal} 
+                                        onChange={(e)=>setInputs({...inputs, meal:e.target.value})} 
+                                        onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && add('meal', inputs.meal)}
+                                        className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none" />
                                     <button onClick={()=>add('meal', inputs.meal)} className="bg-rose-500 text-white p-3 rounded-2xl"><Icon name="utensils" /></button>
                                 </div>
                             </div>
@@ -242,7 +266,6 @@
                                 </button>
                             </div>
 
-                            {/* 達成感機能：全項目を高機能カード化 */}
                             <div className="grid grid-cols-2 gap-4">
                                 <Card id="centering" label="センタリング" icon="compass" color="text-blue-500" unit="分" />
                                 <Card id="greenEx" label="グリーンEX" icon="tree-pine" color="text-emerald-500" unit="分" />
@@ -280,8 +303,12 @@
                                     window.location.href = `mailto:?subject=HabitVibe_Backup&body=${encodeURIComponent(logs)}`;
                                 }} className="w-full bg-indigo-50 text-indigo-600 py-4 rounded-2xl font-bold border border-indigo-100">データバックアップ (Mail)</button>
                             </div>
-                            <div className="mt-8">
-                                <button onclick="localStorage.clear(); location.reload();" style="color: #cbd5e1; font-size: 10px; text-decoration: underline;">全データをリセットして修復</button>
+                            <div className="mt-8 text-center">
+                                <button 
+                                    onClick={() => { if(confirm('全データをリセットしますか？')) { localStorage.clear(); location.reload(); } }} 
+                                    style={{ color: '#cbd5e1', fontSize: '10px', textDecoration: 'underline' }}>
+                                    全データをリセットして修復
+                                </button>
                             </div>
                         </div>
                     )}
