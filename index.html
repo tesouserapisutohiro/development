@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 10.8</title>
+    <title>Habit Vibe 10.9</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
@@ -74,25 +74,4 @@
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <input 
-                            type="text" 
-                            inputMode="numeric" 
-                            placeholder="入力" 
-                            value={inputs[id] || ""} 
-                            onChange={(e) => setInputs(prev => ({...prev, [id]: e.target.value}))} 
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                                    add(id, inputs[id]);
-                                }
-                            }}
-                            className="flex-1 bg-slate-50 rounded-xl px-4 py-2 font-bold outline-none text-slate-700" 
-                        />
-                        <button onClick={() => add(id, inputs[id])} className="bg-indigo-600 text-white px-5 rounded-xl active:scale-95 shadow-md"><Icon name="plus" /></button>
-                    </div>
-                </div>
-            );
-        };
-
-        function HabitApp() {
-            const [history, setHistory] = useState([]);
-            const [inputs, setInputs] = useState({ hiit: "", cooking: "", centering: "", meditation: "", greenEx: "", pages: "", mission: "", meal: "" });
+                        <input
