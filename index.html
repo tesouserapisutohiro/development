@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 10.7</title>
+    <title>Habit Vibe 10.8</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
@@ -96,61 +96,3 @@
         function HabitApp() {
             const [history, setHistory] = useState([]);
             const [inputs, setInputs] = useState({ hiit: "", cooking: "", centering: "", meditation: "", greenEx: "", pages: "", mission: "", meal: "" });
-            const [activeTab, setActiveTab] = useState('input');
-            const [status, setStatus] = useState("読込中");
-            const [tDate, setTDate] = useState(new Date().toLocaleDateString('sv-SE'));
-
-            const today = new Date().toLocaleDateString('sv-SE');
-            const GOAL = 500;
-
-            useEffect(() => {
-                try {
-                    const saved = localStorage.getItem('habit-v6-direct');
-                    if (saved) {
-                        const parsed = JSON.parse(saved);
-                        if (Array.isArray(parsed)) setHistory(parsed);
-                    }
-                    setStatus("同期完了");
-                } catch(e) {
-                    // エラーログ削除済み：単に履歴を空にする
-                    setHistory([]);
-                }
-            }, []);
-
-            useEffect(() => {
-                if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
-            });
-
-            const save = (data) => {
-                setHistory(data);
-                localStorage.setItem('habit-v6-direct', JSON.stringify(data));
-                const now = new Date();
-                setStatus(`保存:${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`);
-            };
-
-            const normalizeNumber = (str) => {
-                return str.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
-            };
-
-            const add = (key, val) => {
-                if (!val) return;
-                const strVal = val.toString().trim();
-                if (strVal === "") return;
-
-                let finalVal;
-                if (key === 'mission' || key === 'meal') {
-                    finalVal = strVal;
-                } else {
-                    const numStr = normalizeNumber(strVal);
-                    finalVal = parseInt(numStr, 10);
-                }
-
-                if (typeof finalVal === 'number' && isNaN(finalVal)) return;
-
-                const entry = { id: Date.now(), date: tDate, key: key, value: finalVal };
-                save([...history, entry]);
-                setInputs(prev => ({ ...prev, [key]: "" }));
-            };
-
-            const toggle = (key) => {
-                const
