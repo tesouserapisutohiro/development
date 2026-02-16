@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 10.1</title>
+    <title>Habit Vibe 10.2</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
@@ -13,47 +13,41 @@
         body { -webkit-tap-highlight-color: transparent; font-family: sans-serif; background-color: #f8fafc; margin: 0; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .luxury-aura { box-shadow: 0 0 25px rgba(251, 191, 36, 0.7); border: 4px solid #fbbf24; }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        /* 起動画面用のスタイル */
-        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s; }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* エラー表示用 */
+        #error-log { color: red; font-size: 12px; padding: 20px; white-space: pre-wrap; display: none; }
     </style>
 </head>
 <body>
 
-    <div id="loader">
-        <div style="color: #64748b; font-weight: bold; font-size: 16px; margin-bottom: 20px;">Habit Vibe 起動中...</div>
-        <div id="loader-help" style="display: none; text-align: center;">
-            <p style="color: #ef4444; font-size: 12px; margin-bottom: 10px;">起動に時間がかかっています。</p>
-            <button onclick="localStorage.clear(); location.reload();" 
-                style="border: 2px solid #ef4444; color: #ef4444; background: white; padding: 10px 20px; border-radius: 99px; font-weight: bold; cursor: pointer;">
-                データをリセットして修復
-            </button>
+    <div id="error-log"></div>
+
+    <div id="root">
+        <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: #cbd5e1;">
+            読み込み中... (画面が変わらない場合は再読み込みしてください)
         </div>
     </div>
 
-    <div id="root" style="display: none;"></div>
-
     <script>
-        // 3秒経っても起動しない場合、リセットボタンを表示するタイマー
-        setTimeout(() => {
-            const loaderHelp = document.getElementById('loader-help');
-            if (loaderHelp && document.getElementById('loader').style.display !== 'none') {
-                loaderHelp.style.display = 'block';
-            }
-        }, 3000);
+        window.onerror = function(message, source, lineno, colno, error) {
+            const log = document.getElementById('error-log');
+            log.style.display = 'block';
+            log.innerHTML += `⚠️ エラー発生: ${message}\n場所: ${source}:${lineno}\n\n`;
+            document.getElementById('root').style.display = 'none'; // エラー時はローディングを消す
+        };
     </script>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // 安全なアイコンコンポーネント
+        // アイコンコンポーネント
         const Icon = ({ name, size = 18, className = "" }) => {
             useEffect(() => {
                 if (window.lucide && window.lucide.createIcons) {
-                    window.lucide.createIcons();
+                    try { window.lucide.createIcons(); } catch(e) {}
                 }
-            }, [name]); 
+            }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
         };
 
@@ -72,7 +66,7 @@
             const today = new Date().toLocaleDateString('sv-SE');
             const GOAL = 500;
 
-            // 初期化処理
+            // データ読み込み
             useEffect(() => {
                 try {
                     const saved = localStorage.getItem('habit-v6-direct');
@@ -82,23 +76,11 @@
                     }
                     setStatus("同期完了");
                 } catch(e) {
-                    console.error("Data Load Error", e);
-                    setHistory([]);
-                }
-                
-                // 起動成功：ローダーを消してアプリを表示
-                const loader = document.getElementById('loader');
-                const root = document.getElementById('root');
-                if (loader && root) {
-                    loader.style.opacity = '0';
-                    setTimeout(() => {
-                        loader.style.display = 'none';
-                        root.style.display = 'block';
-                    }, 500);
+                    setHistory([]); // データが壊れていたら初期化して続行
                 }
             }, []);
 
-            // 画面更新ごとのアイコン描画
+            // 画面描画のたびにアイコン更新
             useEffect(() => {
                 if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
             });
@@ -122,6 +104,7 @@
                 setInputs(prev => ({ ...prev, [key]: "" }));
             };
 
+            // 冷水・弁当のトグル
             const toggle = (key) => {
                 const existing = history.find(e => e.date === tDate && e.key === key);
                 if (existing) {
@@ -132,7 +115,7 @@
                 }
             };
 
-            // ポイント計算（安全設計）
+            // ポイント計算
             const weeklyPoints = useMemo(() => {
                 let pts = 0;
                 const limit = new Date(); limit.setDate(limit.getDate() - 7);
@@ -153,7 +136,7 @@
 
             const luxury = weeklyPoints >= GOAL;
 
-            // 合計時間の計算（達成感用）
+            // 今日の合計計算（足し算機能用）
             const dayTotals = useMemo(() => {
                 const res = {};
                 history.filter(e => e.date === tDate).forEach(e => {
@@ -167,7 +150,7 @@
                 return m.length > 0 ? m[m.length-1].value : null;
             }, [history]);
 
-            // 高機能カード
+            // 高機能カード（数字の合計を表示）
             const Card = ({ id, label, icon, color, unit, weight }) => (
                 <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm space-y-3">
                     <div className="flex justify-between items-center px-1 font-bold text-slate-600 text-sm">
@@ -176,6 +159,7 @@
                             <span>{label} <span className="text-[10px] text-slate-400 font-normal">{weight}</span></span>
                         </div>
                         <div className="flex items-baseline gap-1">
+                            {/* ここで合計値を表示 */}
                             <span className="text-xl font-black text-slate-800">{(dayTotals[id] || 0)}</span>
                             <span className="text-[10px] text-slate-400 ml-1 uppercase">{unit}</span>
                         </div>
@@ -191,7 +175,7 @@
                 <div className="max-w-md mx-auto p-4 pb-24 min-h-screen fade-in">
                     <header className="flex justify-between items-center mb-6 px-1">
                         <div>
-                            <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 10.1</h1>
+                            <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 10.2</h1>
                             <span className="text-[10px] font-bold text-emerald-500 mt-1 uppercase tracking-widest flex items-center gap-1"><Icon name="check-circle" size={12} /> {status}</span>
                         </div>
                         <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
@@ -237,4 +221,76 @@
                             </div>
 
                             <div className="p-6 rounded-[2.5rem] bg-rose-50 border border-rose-100 space-y-3">
-                                <div className="flex items-center gap-2 font-bold text-rose-600 text-[10px] uppercase tracking-widest"><Icon name="heart" size={1
+                                <div className="flex items-center gap-2 font-bold text-rose-600 text-[10px] uppercase tracking-widest"><Icon name="heart" size={14} /> MENU (30pt)</div>
+                                <div className="flex gap-2">
+                                    <input type="text" placeholder="例：山芋の茶碗蒸し！" value={inputs.meal} onChange={(e)=>setInputs({...inputs, meal:e.target.value})} className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none" />
+                                    <button onClick={()=>add('meal', inputs.meal)} className="bg-rose-500 text-white p-3 rounded-2xl"><Icon name="utensils" /></button>
+                                </div>
+                            </div>
+
+                            <Card id="hiit" label="HIIT" icon="zap" color="text-red-500" unit="分" weight="x20pt" />
+                            <Card id="cooking" label="料理記録" icon="chef-hat" color="text-rose-500" unit="回" weight="x30pt" />
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <button onClick={() => toggle('coldWater')} className={`p-5 rounded-[2.5rem] border flex flex-col items-center gap-1 transition-all shadow-sm ${dayTotals['coldWater'] ? 'bg-blue-500 text-white border-blue-600 shadow-lg' : 'bg-white text-blue-500 border-slate-100'}`}>
+                                    <Icon name="droplets" size={24} />
+                                    <span className="text-[9px] font-black uppercase">冷水 (10pt)</span>
+                                </button>
+                                <button onClick={() => toggle('bento')} className={`p-5 rounded-[2.5rem] border flex flex-col items-center gap-1 transition-all shadow-sm ${dayTotals['bento'] ? 'bg-amber-500 text-white border-amber-600 shadow-lg' : 'bg-white text-amber-500 border-slate-100'}`}>
+                                    <Icon name="box" size={24} />
+                                    <span className="text-[9px] font-black uppercase">弁当 (10pt)</span>
+                                </button>
+                            </div>
+
+                            {/* 達成感機能：全項目を高機能カード化 */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <Card id="centering" label="センタリング" icon="compass" color="text-blue-500" unit="分" />
+                                <Card id="greenEx" label="グリーンEX" icon="tree-pine" color="text-emerald-500" unit="分" />
+                                <Card id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" />
+                                <Card id="pages" label="読書" icon="book-open" color="text-orange-500" unit="頁" />
+                            </div>
+
+                            <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 mt-6 mb-10">
+                                <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 italic flex items-center gap-2"><Icon name="list" size={12} /> {tDate} Logs</h2>
+                                <div className="space-y-2">
+                                    {history.filter(e => e.date === tDate).reverse().map(e => (
+                                        <div key={e.id} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 px-1">
+                                            <div className="flex flex-col text-sm font-bold leading-tight">
+                                                <span className="text-[8px] font-bold text-slate-300 uppercase">{e.key}</span>
+                                                <span className={e.key === 'meal' ? 'text-rose-500 italic' : 'text-slate-600'}>{typeof e.value === 'number' ? `+${e.value}` : e.value}</span>
+                                            </div>
+                                            <button onClick={() => save(history.filter(h => h.id !== e.id))} className="text-slate-200 p-2"><Icon name="trash-2" size={16} /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div key="stats-view" className="space-y-6 animate-in fade-in pb-10">
+                            {bestDish && (
+                                <div className="p-8 rounded-[2.5rem] bg-white shadow-lg border-2 border-rose-100 text-center space-y-3">
+                                    <Icon name="award" className="text-rose-500 mx-auto" size={32} />
+                                    <h2 className="text-[10px] font-black text-rose-400 uppercase tracking-widest text-center">Week's Best Dish</h2>
+                                    <p className="text-xl font-black text-slate-800 leading-tight italic">「{bestDish}」</p>
+                                </div>
+                            )}
+                            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 text-center">
+                                <button onClick={() => {
+                                    const logs = history.map(h => `${h.date} [${h.key}] ${h.value}`).join('\n');
+                                    window.location.href = `mailto:?subject=HabitVibe_Backup&body=${encodeURIComponent(logs)}`;
+                                }} className="w-full bg-indigo-50 text-indigo-600 py-4 rounded-2xl font-bold border border-indigo-100">データバックアップ (Mail)</button>
+                            </div>
+                            <div className="mt-8">
+                                <button onclick="localStorage.clear(); location.reload();" style="color: #cbd5e1; font-size: 10px; text-decoration: underline;">全データをリセットして修復</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<HabitApp />);
+    </script>
+</body>
+</html>
